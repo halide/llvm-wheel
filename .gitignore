@@ -1,0 +1,4 @@
+.venv/
+cmake-build-*/
+build*/
+.idea/
