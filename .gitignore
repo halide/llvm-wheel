@@ -1,0 +1,13 @@
+# LLVM source cache (downloaded by version provider)
+/src_cache/
+
+# Build artifacts
+/build/
+/dist/
+*.whl
+*.egg-info/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
