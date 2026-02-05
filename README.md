@@ -54,15 +54,31 @@ a timestamp (for monotonic ordering) and short SHA (for traceability).
 
 ```bash
 export HALIDE_LLVM_REF="llvmorg-21.1.6"
-pip wheel .
+pip wheel . --no-build-isolation
 ```
 
 ### Development Build (main branch)
 
 ```bash
 export HALIDE_LLVM_REF="main"
-pip wheel .
+pip wheel . --no-build-isolation
 ```
+
+### Incremental Rebuilds
+
+LLVM caches the Python interpreter path. When using build isolation (the
+default), the ephemeral venv path changes between runs, breaking incremental
+builds. For local development, always use `--no-build-isolation`:
+
+```bash
+# pip
+pip wheel . --no-build-isolation
+
+# uv
+UV_NO_BUILD_ISOLATION=1 uv build --wheel
+```
+
+For CI, where you want fresh builds anyway, build isolation is fine.
 
 ### With a Specific Toolchain
 

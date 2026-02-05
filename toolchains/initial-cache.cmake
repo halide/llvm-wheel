@@ -57,7 +57,8 @@ set(LLVM_INCLUDE_UTILS       OFF CACHE BOOL "")
 # Clang feature disables
 ##############################################################################
 
-set(CLANG_ENABLE_ARCMT              OFF CACHE BOOL "")
+set(CLANG_ENABLE_ARCMT              OFF CACHE BOOL "")  # LLVM 20
+set(CLANG_ENABLE_OBJC_REWRITER      OFF CACHE BOOL "")  # LLVM 21+
 set(CLANG_ENABLE_CLANGD             OFF CACHE BOOL "")
 set(CLANG_ENABLE_STATIC_ANALYZER    OFF CACHE BOOL "")
 set(CLANG_INCLUDE_DOCS              OFF CACHE BOOL "")

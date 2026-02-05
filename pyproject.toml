@@ -14,8 +14,20 @@ halide-llvm = "halide_llvm:main"
 
 [tool.scikit-build]
 minimum-version = "build-system.requires"
-build-dir = "build/{wheel_tag}"
 experimental = true  # Required for in-tree metadata plugins
+
+# Persistent build directory for incremental rebuilds.
+# IMPORTANT: LLVM caches the Python interpreter path. If using build isolation,
+# the ephemeral venv path changes between runs, breaking the cache. Use
+# --no-build-isolation (pip) or UV_NO_BUILD_ISOLATION=1 (uv) for local dev.
+build-dir = "build/{wheel_tag}"
+cmake.build-type = "Release"
+
+# Include the Python helper module
+wheel.packages = ["src/halide_llvm"]
+
+# Install LLVM into halide_llvm/data/ so the Python module can find it
+wheel.install-dir = "halide_llvm/data"
 
 [tool.scikit-build.metadata.version]
 provider = "_version_provider"
