@@ -34,8 +34,4 @@ include("${CMAKE_CURRENT_LIST_DIR}/initial-cache.cmake")
 
 # set(CMAKE_CROSSCOMPILING_EMULATOR /usr/bin/env)
 
-##############################################################################
-# LLVM overrides
-##############################################################################
-
-set(LLVM_BUILD_32_BITS ON CACHE BOOL "")
+# set(LLVM_DEFAULT_TARGET_TRIPLE "i686-linux-gnu" CACHE STRING "")

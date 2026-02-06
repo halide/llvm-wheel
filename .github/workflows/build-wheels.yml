@@ -203,8 +203,6 @@ jobs:
         run: |
           pip install delocate
           delocate-wheel -w dist/ dist/*.whl
-          # Remove the original unrepaired wheel
-          rm -f dist/*-macosx_*_universal*.whl 2>/dev/null || true
 
       # ---- Upload artifact ----
       - name: Upload wheel

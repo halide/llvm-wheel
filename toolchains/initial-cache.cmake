@@ -57,6 +57,23 @@ set(LLVM_INCLUDE_TESTS       OFF CACHE BOOL "")
 set(LLVM_INCLUDE_UTILS       OFF CACHE BOOL "")
 
 ##############################################################################
+# Install RPATHs
+#
+# Ensure installed shared libraries (especially the LLVM runtimes: libc++,
+# libc++abi, libunwind) can find each other via relative paths. Without
+# this, CMake strips build-tree RPATHs at install time and leaves nothing.
+# RUNTIMES_CMAKE_ARGS forwards this to the separate runtimes sub-build.
+##############################################################################
+
+if(APPLE)
+  set(CMAKE_INSTALL_RPATH "@loader_path;@loader_path/../lib" CACHE STRING "")
+  set(RUNTIMES_CMAKE_ARGS "-DCMAKE_INSTALL_RPATH=@loader_path" CACHE STRING "")
+elseif(UNIX)
+  set(CMAKE_INSTALL_RPATH "$ORIGIN;$ORIGIN/../lib" CACHE STRING "")
+  set(RUNTIMES_CMAKE_ARGS "-DCMAKE_INSTALL_RPATH=$ORIGIN" CACHE STRING "")
+endif()
+
+##############################################################################
 # Clang feature disables
 ##############################################################################
 
