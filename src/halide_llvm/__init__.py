@@ -26,8 +26,7 @@ def get_root_dir() -> Path:
         return data_dir
 
     raise RuntimeError(
-        f"Could not locate halide-llvm data directory. "
-        f"Expected at {data_dir}"
+        f"Could not locate halide-llvm data directory. Expected at {data_dir}"
     )
 
 
@@ -62,11 +61,23 @@ def main():
     parser.add_argument("--version", action="version", version=__version__)
 
     group = parser.add_mutually_exclusive_group()
-    group.add_argument("--prefix", action="store_true", help="Print the installation prefix.")
-    group.add_argument("--bindir", action="store_true", help="Directory containing LLVM executables.")
-    group.add_argument("--includedir", action="store_true", help="Directory containing LLVM headers.")
-    group.add_argument("--libdir", action="store_true", help="Directory containing LLVM libraries.")
-    group.add_argument("--cmakedir", action="store_true", help="Directory containing LLVM CMake modules.")
+    group.add_argument(
+        "--prefix", action="store_true", help="Print the installation prefix."
+    )
+    group.add_argument(
+        "--bindir", action="store_true", help="Directory containing LLVM executables."
+    )
+    group.add_argument(
+        "--includedir", action="store_true", help="Directory containing LLVM headers."
+    )
+    group.add_argument(
+        "--libdir", action="store_true", help="Directory containing LLVM libraries."
+    )
+    group.add_argument(
+        "--cmakedir",
+        action="store_true",
+        help="Directory containing LLVM CMake modules.",
+    )
 
     args = parser.parse_args()
 

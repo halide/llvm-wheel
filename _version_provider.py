@@ -41,7 +41,7 @@ def dynamic_metadata(
     if not ref:
         msg = (
             "Environment variable 'HALIDE_LLVM_REF' is required.\n"
-            "Examples: 'llvmorg-21.1.6', 'main', or a commit SHA"
+            "Examples: 'llvmorg-21.1.8', 'main', or a commit SHA"
         )
         raise RuntimeError(msg)
 
@@ -139,7 +139,9 @@ def get_commit_sha(ref: str) -> str:
     """
     Resolve a git ref to its full commit SHA via the GitHub API.
     """
-    url = f"https://api.github.com/repos/{LLVM_REPO_OWNER}/{LLVM_REPO_NAME}/commits/{ref}"
+    url = (
+        f"https://api.github.com/repos/{LLVM_REPO_OWNER}/{LLVM_REPO_NAME}/commits/{ref}"
+    )
     req = urllib.request.Request(url)
     req.add_header("User-Agent", "halide-llvm-version-provider")
 

@@ -1,13 +1,4 @@
-# initial-cache.cmake -- Canonical LLVM build configuration for Halide
-#
-# This file is not meant to be used directly. Instead, use one of the
-# per-platform toolchain files in this directory:
-#
-#   cmake -G Ninja \
-#     -DCMAKE_TOOLCHAIN_FILE=halide-llvm/toolchains/x86-64-linux.cmake \
-#     -S llvm-project/llvm -B build
-#
-# See LLVM-Building-Claude.md for a full analysis of the build sites.
+# Canonical LLVM build configuration for Halide
 
 ##############################################################################
 # Core build settings

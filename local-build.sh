@@ -2,7 +2,7 @@
 # local-build.sh -- Build halide-llvm wheel for local development
 #
 # Usage:
-#   export HALIDE_LLVM_REF=llvmorg-21.1.6
+#   export HALIDE_LLVM_REF=llvmorg-21.1.8
 #   ./local-build.sh
 #
 # This script:
@@ -15,12 +15,12 @@ set -euo pipefail
 
 # Validate HALIDE_LLVM_REF
 if [[ -z "${HALIDE_LLVM_REF:-}" ]]; then
-    echo "error: HALIDE_LLVM_REF is not set" >&2
-    echo "" >&2
-    echo "Usage:" >&2
-    echo "  export HALIDE_LLVM_REF=llvmorg-21.1.6  # or 'main', or a commit SHA" >&2
-    echo "  ./local-build.sh" >&2
-    exit 1
+  echo "error: HALIDE_LLVM_REF is not set" >&2
+  echo "" >&2
+  echo "Usage:" >&2
+  echo "  export HALIDE_LLVM_REF=llvmorg-21.1.8  # or 'main', or a commit SHA" >&2
+  echo "  ./local-build.sh" >&2
+  exit 1
 fi
 
 # Detect host platform
@@ -28,32 +28,32 @@ OS="$(uname -s)"
 ARCH="$(uname -m)"
 
 case "$OS" in
-    Linux)
-        case "$ARCH" in
-            x86_64)  TOOLCHAIN="x86-64-linux.cmake" ;;
-            aarch64) TOOLCHAIN="arm-64-linux.cmake" ;;
-            *)
-                echo "error: unsupported Linux architecture: $ARCH" >&2
-                exit 1
-                ;;
-        esac
-        ;;
-    Darwin)
-        export MACOSX_DEPLOYMENT_TARGET=11
-        case "$ARCH" in
-            x86_64) TOOLCHAIN="x86-64-macos.cmake" ;;
-            arm64)  TOOLCHAIN="arm-64-macos.cmake" ;;
-            *)
-                echo "error: unsupported macOS architecture: $ARCH" >&2
-                exit 1
-                ;;
-        esac
-        ;;
-    *)
-        echo "error: unsupported OS: $OS" >&2
-        echo "hint: on Windows, use pip directly with the appropriate toolchain" >&2
-        exit 1
-        ;;
+Linux)
+  case "$ARCH" in
+  x86_64) TOOLCHAIN="x86-64-linux.cmake" ;;
+  aarch64) TOOLCHAIN="arm-64-linux.cmake" ;;
+  *)
+    echo "error: unsupported Linux architecture: $ARCH" >&2
+    exit 1
+    ;;
+  esac
+  ;;
+Darwin)
+  export MACOSX_DEPLOYMENT_TARGET=11
+  case "$ARCH" in
+  x86_64) TOOLCHAIN="x86-64-macos.cmake" ;;
+  arm64) TOOLCHAIN="arm-64-macos.cmake" ;;
+  *)
+    echo "error: unsupported macOS architecture: $ARCH" >&2
+    exit 1
+    ;;
+  esac
+  ;;
+*)
+  echo "error: unsupported OS: $OS" >&2
+  echo "hint: on Windows, use pip directly with the appropriate toolchain" >&2
+  exit 1
+  ;;
 esac
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -63,8 +63,8 @@ cd "$SCRIPT_DIR"
 
 # Bootstrap build environment
 if [[ ! -d "$SCRIPT_DIR/.venv" ]]; then
-    echo "Creating virtual environment..."
-    uv venv "$SCRIPT_DIR/.venv"
+  echo "Creating virtual environment..."
+  uv venv "$SCRIPT_DIR/.venv"
 fi
 
 echo "Installing build dependencies..."
@@ -77,18 +77,18 @@ echo "  Toolchain: $TOOLCHAIN"
 
 # Build config settings
 CONFIG_SETTINGS=(
-    "--config-settings=cmake.define.CMAKE_TOOLCHAIN_FILE=$TOOLCHAIN_PATH"
+  "--config-settings=cmake.define.CMAKE_TOOLCHAIN_FILE=$TOOLCHAIN_PATH"
 )
 
 # Enable ccache if available
-if command -v ccache &> /dev/null; then
-    echo "  ccache: enabled"
-    CONFIG_SETTINGS+=(
-        "--config-settings=cmake.define.CMAKE_C_COMPILER_LAUNCHER=ccache"
-        "--config-settings=cmake.define.CMAKE_CXX_COMPILER_LAUNCHER=ccache"
-    )
+if command -v ccache &>/dev/null; then
+  echo "  ccache: enabled"
+  CONFIG_SETTINGS+=(
+    "--config-settings=cmake.define.CMAKE_C_COMPILER_LAUNCHER=ccache"
+    "--config-settings=cmake.define.CMAKE_CXX_COMPILER_LAUNCHER=ccache"
+  )
 else
-    echo "  ccache: not found (install for faster rebuilds)"
+  echo "  ccache: not found (install for faster rebuilds)"
 fi
 
 echo ""

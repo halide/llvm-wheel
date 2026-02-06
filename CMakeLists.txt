@@ -8,7 +8,7 @@ set(HALIDE_LLVM_REF "$ENV{HALIDE_LLVM_REF}")
 if (NOT HALIDE_LLVM_REF)
     message(FATAL_ERROR
         "HALIDE_LLVM_REF environment variable is required.\n"
-        "Examples: 'llvmorg-21.1.6', 'main', or a commit SHA"
+        "Examples: 'llvmorg-21.1.8', 'main', or a commit SHA"
     )
 endif ()
 
