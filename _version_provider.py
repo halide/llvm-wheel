@@ -53,7 +53,10 @@ def dynamic_metadata(
 
     # 2. Download source if not cached
     commit_sha = None
-    if not source_dir.exists():
+    if not is_valid_cached_source(source_dir):
+        if source_dir.exists():
+            print(f"[provider] Invalid cache detected, removing: {source_dir}")
+            shutil.rmtree(source_dir)
         commit_sha = download_and_extract(ref, source_dir)
     else:
         print(f"[provider] Using cached source: {source_dir}")
@@ -70,6 +73,11 @@ def sanitize_ref_for_path(ref: str) -> str:
     Must match the logic in CMakeLists.txt.
     """
     return re.sub(r'[\\/:*?"<>|]', "_", ref)
+
+
+def is_valid_cached_source(source_dir: Path) -> bool:
+    """Return True only if cache contains the expected LLVM source layout."""
+    return (source_dir / "llvm" / "CMakeLists.txt").exists()
 
 
 def compute_version(ref: str, source_dir: Path, commit_sha: str | None) -> str:
