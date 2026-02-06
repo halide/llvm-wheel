@@ -19,7 +19,6 @@ import shutil
 import tarfile
 import urllib.error
 import urllib.request
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -83,21 +82,19 @@ def compute_version(ref: str, source_dir: Path) -> str:
     Compute PEP 440 version string.
 
     - Release tags (llvmorg-X.Y.Z) -> X.Y.Z
-    - Everything else -> X.Y.Z.devYYYYMMDDHHMM+g<sha>
+    - Everything else -> X.Y.Z.dev0+g<sha>
     """
     # Check for release tag pattern
     tag_match = re.match(r"^llvmorg-(\d+\.\d+\.\d+)$", ref)
     if tag_match:
         return tag_match.group(1)
 
-    # Development version: need base version, timestamp, and SHA
+    # Development version: need base version and SHA
     base_ver = get_base_version(source_dir)
-
-    # Get commit info from GitHub API
-    timestamp, sha = get_commit_info(ref)
+    sha = get_commit_sha(ref)
 
     short_sha = sha[:8] if sha else "unknown"
-    return f"{base_ver}.dev{timestamp}+g{short_sha}"
+    return f"{base_ver}.dev0+g{short_sha}"
 
 
 def get_base_version(source_dir: Path) -> str:
@@ -138,10 +135,9 @@ def parse_cmake_int_var(content: str, var_name: str) -> str | None:
     return match.group(1) if match else None
 
 
-def get_commit_info(ref: str) -> tuple[str, str]:
+def get_commit_sha(ref: str) -> str:
     """
-    Fetch commit timestamp and SHA from GitHub API.
-    Returns (timestamp_str, sha) where timestamp_str is YYYYMMDDHHMM.
+    Resolve a git ref to its full commit SHA via the GitHub API.
     """
     url = f"https://api.github.com/repos/{LLVM_REPO_OWNER}/{LLVM_REPO_NAME}/commits/{ref}"
     req = urllib.request.Request(url)
@@ -157,13 +153,7 @@ def get_commit_info(ref: str) -> tuple[str, str]:
         with urllib.request.urlopen(req, timeout=30) as response:
             data = json.load(response)
 
-        iso_date = data["commit"]["committer"]["date"]
-        dt = datetime.strptime(iso_date, "%Y-%m-%dT%H:%M:%SZ").replace(
-            tzinfo=timezone.utc
-        )
-        timestamp = dt.strftime("%Y%m%d%H%M")
-        sha = data["sha"]
-        return timestamp, sha
+        return data["sha"]
 
     except (urllib.error.HTTPError, urllib.error.URLError, KeyError) as e:
         raise RuntimeError(
