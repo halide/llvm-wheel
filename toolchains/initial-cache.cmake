@@ -14,7 +14,11 @@
 ##############################################################################
 
 set(LLVM_ENABLE_PROJECTS "clang;lld" CACHE STRING "")
-set(LLVM_ENABLE_RUNTIMES "compiler-rt;libcxx;libcxxabi;libunwind" CACHE STRING "")
+
+if(NOT DEFINED LLVM_ENABLE_RUNTIMES)
+  set(LLVM_ENABLE_RUNTIMES "compiler-rt;libcxx;libcxxabi;libunwind")
+endif()
+set(LLVM_ENABLE_RUNTIMES "${LLVM_ENABLE_RUNTIMES}" CACHE STRING "")
 set(LLVM_TARGETS_TO_BUILD "AArch64;ARM;Hexagon;NVPTX;PowerPC;RISCV;WebAssembly;X86" CACHE STRING "")
 
 # Build lld libraries but not the lld tool (Halide links against the libraries)

@@ -11,4 +11,8 @@
 #     -DCMAKE_TOOLCHAIN_FILE=halide-llvm/toolchains/x86-64-windows.cmake \
 #     -S llvm-project/llvm -B build
 
+# Only compiler-rt is relevant on Windows. libc++, libc++abi, and libunwind
+# are tied to the Itanium C++ ABI and do not build with MSVC.
+set(LLVM_ENABLE_RUNTIMES "compiler-rt")
+
 include("${CMAKE_CURRENT_LIST_DIR}/initial-cache.cmake")
