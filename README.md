@@ -48,7 +48,7 @@ a timestamp (for monotonic ordering) and short SHA (for traceability).
 - C++ compiler (Clang, GCC, or MSVC)
 - CMake 3.21+
 - Ninja
-- Python 3.10+
+- Python 3.12+
 
 ### Release Build
 

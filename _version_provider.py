@@ -189,7 +189,7 @@ def download_and_extract(ref: str, dest_dir: Path) -> str | None:
     # Extract tarball
     print(f"[provider] Extracting ({len(tarball_data) // 1024 // 1024} MB)...")
     with tarfile.open(fileobj=io.BytesIO(tarball_data), mode="r:gz") as tar:
-        tar.extractall(path=temp_dir)
+        tar.extractall(path=temp_dir, filter="data")
 
     # GitHub tarballs have a single root directory like 'llvm-project-<ref>/'
     extracted_roots = [p for p in temp_dir.iterdir() if p.is_dir()]
