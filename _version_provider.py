@@ -51,17 +51,16 @@ def dynamic_metadata(
     source_dir = CACHE_ROOT / safe_ref
 
     # 2. Download source if not cached
-    commit_sha = None
     if not is_valid_cached_source(source_dir):
         if source_dir.exists():
             print(f"[provider] Invalid cache detected, removing: {source_dir}")
             shutil.rmtree(source_dir)
-        commit_sha = download_and_extract(ref, source_dir)
+        download_and_extract(ref, source_dir)
     else:
         print(f"[provider] Using cached source: {source_dir}")
 
     # 3. Compute version
-    version = compute_version(ref, source_dir, commit_sha)
+    version = compute_version(ref, source_dir)
     print(f"[provider] Resolved version: {version}")
     return version
 
@@ -79,7 +78,7 @@ def is_valid_cached_source(source_dir: Path) -> bool:
     return (source_dir / "llvm" / "CMakeLists.txt").exists()
 
 
-def compute_version(ref: str, source_dir: Path, commit_sha: str | None) -> str:
+def compute_version(ref: str, source_dir: Path) -> str:
     """
     Compute PEP 440 version string.
 
@@ -172,11 +171,8 @@ def get_commit_info(ref: str) -> tuple[str, str]:
         ) from e
 
 
-def download_and_extract(ref: str, dest_dir: Path) -> str | None:
-    """
-    Download tarball from GitHub and extract to dest_dir.
-    Returns the commit SHA if available.
-    """
+def download_and_extract(ref: str, dest_dir: Path) -> None:
+    """Download tarball from GitHub and extract to dest_dir."""
     # GitHub tarball URLs to try (tag URL first, then generic)
     urls = [
         f"https://github.com/{LLVM_REPO_OWNER}/{LLVM_REPO_NAME}/archive/refs/tags/{ref}.tar.gz",
@@ -234,12 +230,3 @@ def download_and_extract(ref: str, dest_dir: Path) -> str | None:
     shutil.rmtree(temp_dir)
 
     print(f"[provider] Extracted to {dest_dir}")
-
-    # Try to extract SHA from the directory name (llvm-project-<sha>)
-    # This works for commit SHAs but not for tags/branches
-    root_name = actual_root.name
-    sha_match = re.search(r"llvm-project-([a-f0-9]{40})", root_name)
-    if sha_match:
-        return sha_match.group(1)
-
-    return None
