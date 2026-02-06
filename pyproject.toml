@@ -29,6 +29,9 @@ wheel.packages = ["src/halide_llvm"]
 # Install LLVM into halide_llvm/data/ so the Python module can find it
 wheel.install-dir = "halide_llvm/data"
 
+# No Python extension modules, so use py3-none tag instead of cpXYZ
+wheel.py-api = "py3"
+
 [tool.scikit-build.metadata.version]
 provider = "_version_provider"
 provider-path = "."

@@ -39,6 +39,7 @@ case "$OS" in
         esac
         ;;
     Darwin)
+        export MACOSX_DEPLOYMENT_TARGET=11
         case "$ARCH" in
             x86_64) TOOLCHAIN="x86-64-macos.cmake" ;;
             arm64)  TOOLCHAIN="arm-64-macos.cmake" ;;

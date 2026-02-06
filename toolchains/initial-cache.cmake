@@ -13,9 +13,12 @@
 # Core build settings
 ##############################################################################
 
-set(LLVM_ENABLE_PROJECTS "clang;lld;clang-tools-extra" CACHE STRING "")
+set(LLVM_ENABLE_PROJECTS "clang;lld" CACHE STRING "")
 set(LLVM_ENABLE_RUNTIMES "compiler-rt;libcxx;libcxxabi;libunwind" CACHE STRING "")
 set(LLVM_TARGETS_TO_BUILD "AArch64;ARM;Hexagon;NVPTX;PowerPC;RISCV;WebAssembly;X86" CACHE STRING "")
+
+# Build lld libraries but not the lld tool (Halide links against the libraries)
+set(LLD_BUILD_TOOLS OFF CACHE BOOL "")
 
 ##############################################################################
 # Features we always want ON
@@ -57,6 +60,13 @@ set(LLVM_INCLUDE_UTILS       OFF CACHE BOOL "")
 # Clang feature disables
 ##############################################################################
 
+# Disable symlinks to clang (clang++, clang-cl, clang-cpp).
+# Wheels are ZIP files which don't support symlinks, so each "symlink" becomes
+# a full copy of the ~128MB clang binary. Users can invoke clang with
+# --driver-mode=g++ (for clang++) or --driver-mode=cl (for clang-cl) instead.
+# Note: clang-XX (versioned symlink) can't be disabled without CMake errors.
+set(CLANG_LINKS_TO_CREATE "" CACHE STRING "")
+
 set(CLANG_ENABLE_ARCMT              OFF CACHE BOOL "")  # LLVM 20
 set(CLANG_ENABLE_OBJC_REWRITER      OFF CACHE BOOL "")  # LLVM 21+
 set(CLANG_ENABLE_CLANGD             OFF CACHE BOOL "")
@@ -65,8 +75,6 @@ set(CLANG_INCLUDE_DOCS              OFF CACHE BOOL "")
 set(CLANG_INSTALL_SCANBUILD         OFF CACHE BOOL "")
 set(CLANG_INSTALL_SCANVIEW          OFF CACHE BOOL "")
 set(CLANG_PLUGIN_SUPPORT            OFF CACHE BOOL "")
-set(CLANG_TIDY_ENABLE_STATIC_ANALYZER OFF CACHE BOOL "")
-set(CLANG_TOOLS_EXTRA_INCLUDE_DOCS  OFF CACHE BOOL "")
 
 ##############################################################################
 # Clang tool disables
@@ -91,10 +99,14 @@ set(CLANG_TOOL_CLANG_RENAME_BUILD           OFF CACHE BOOL "")
 set(CLANG_TOOL_CLANG_REPL_BUILD             OFF CACHE BOOL "")
 set(CLANG_TOOL_CLANG_SCAN_DEPS_BUILD        OFF CACHE BOOL "")
 set(CLANG_TOOL_CLANG_SHLIB_BUILD            OFF CACHE BOOL "")
+set(CLANG_TOOL_CLANG_SYCL_LINKER_BUILD      OFF CACHE BOOL "")
+set(CLANG_TOOL_CLANG_INSTALLAPI_BUILD       OFF CACHE BOOL "")
+set(CLANG_TOOL_CLANG_NVLINK_WRAPPER_BUILD   OFF CACHE BOOL "")
 set(CLANG_TOOL_DIAGTOOL_BUILD               OFF CACHE BOOL "")
 set(CLANG_TOOL_DICTIONARY_BUILD             OFF CACHE BOOL "")
 set(CLANG_TOOL_LIBCLANG_BUILD               OFF CACHE BOOL "")
 set(CLANG_TOOL_NVPTX_ARCH_BUILD             OFF CACHE BOOL "")
+set(CLANG_TOOL_OFFLOAD_ARCH_BUILD           OFF CACHE BOOL "")
 set(CLANG_TOOL_SCAN_BUILD_BUILD             OFF CACHE BOOL "")
 set(CLANG_TOOL_SCAN_BUILD_PY_BUILD          OFF CACHE BOOL "")
 set(CLANG_TOOL_SCAN_VIEW_BUILD              OFF CACHE BOOL "")
@@ -116,7 +128,9 @@ set(LLVM_TOOL_LLVM_BCANALYZER_BUILD                 OFF CACHE BOOL "")
 set(LLVM_TOOL_LLVM_C_TEST_BUILD                     OFF CACHE BOOL "")
 set(LLVM_TOOL_LLVM_CAT_BUILD                        OFF CACHE BOOL "")
 set(LLVM_TOOL_LLVM_CFI_VERIFY_BUILD                 OFF CACHE BOOL "")
+set(LLVM_TOOL_LLVM_CGDATA_BUILD                     OFF CACHE BOOL "")
 set(LLVM_TOOL_LLVM_COV_BUILD                        OFF CACHE BOOL "")
+set(LLVM_TOOL_LLVM_CTXPROF_UTIL_BUILD               OFF CACHE BOOL "")
 set(LLVM_TOOL_LLVM_CVTRES_BUILD                     OFF CACHE BOOL "")
 set(LLVM_TOOL_LLVM_CXXDUMP_BUILD                    OFF CACHE BOOL "")
 set(LLVM_TOOL_LLVM_CXXFILT_BUILD                    OFF CACHE BOOL "")
@@ -164,6 +178,7 @@ set(LLVM_TOOL_LLVM_RC_BUILD                         OFF CACHE BOOL "")
 set(LLVM_TOOL_LLVM_READOBJ_BUILD                    OFF CACHE BOOL "")
 set(LLVM_TOOL_LLVM_READTAPI_BUILD                   OFF CACHE BOOL "")
 set(LLVM_TOOL_LLVM_REDUCE_BUILD                     OFF CACHE BOOL "")
+set(LLVM_TOOL_REDUCE_CHUNK_LIST_BUILD               OFF CACHE BOOL "")
 set(LLVM_TOOL_LLVM_REMARKUTIL_BUILD                 OFF CACHE BOOL "")
 set(LLVM_TOOL_LLVM_RTDYLD_BUILD                     OFF CACHE BOOL "")
 set(LLVM_TOOL_LLVM_RUST_DEMANGLE_FUZZER_BUILD       OFF CACHE BOOL "")
