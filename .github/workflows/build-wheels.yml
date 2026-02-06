@@ -1,0 +1,203 @@
+name: Build wheels
+
+on:
+  workflow_dispatch:
+    inputs:
+      llvm_ref:
+        description: "LLVM git ref (tag, branch, or SHA)"
+        required: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Job 1: Determine whether we need to build at all
+  # ---------------------------------------------------------------------------
+  check:
+    name: Check for existing wheels
+    runs-on: ubuntu-latest
+    outputs:
+      should_build: ${{ steps.check.outputs.should_build }}
+      short_sha: ${{ steps.check.outputs.short_sha }}
+    steps:
+      - name: Resolve ref and check PyPI
+        id: check
+        env:
+          LLVM_REF: ${{ inputs.llvm_ref }}
+        run: |
+          set -euo pipefail
+
+          # Resolve the ref to a full SHA via GitHub API
+          SHA=$(curl -fsSL \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/llvm/llvm-project/commits/${LLVM_REF}" \
+            | jq -r '.sha')
+
+          SHORT_SHA="${SHA:0:8}"
+          echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "Resolved ${LLVM_REF} -> ${SHA} (short: ${SHORT_SHA})"
+
+          # Fetch the simple index page for halide-llvm
+          INDEX=$(curl -fsSL "https://pypi.halide-lang.org/simple/halide-llvm/" || true)
+
+          # Determine the search pattern based on whether this is a release tag
+          if [[ "${LLVM_REF}" =~ ^llvmorg-([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            VERSION="${BASH_REMATCH[1]}"
+            PATTERN="halide_llvm-${VERSION}-"
+            echo "Release tag detected, searching for: ${PATTERN}"
+          else
+            PATTERN="g${SHORT_SHA}"
+            echo "Dev ref detected, searching for: ${PATTERN}"
+          fi
+
+          if echo "${INDEX}" | grep -qF "${PATTERN}"; then
+            echo "Wheels already exist for this ref, skipping build."
+            echo "should_build=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "No existing wheels found, proceeding with build."
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  # ---------------------------------------------------------------------------
+  # Job 2: Build wheels for all platforms
+  # ---------------------------------------------------------------------------
+  build:
+    name: Build / ${{ matrix.platform }}
+    needs: check
+    if: needs.check.outputs.should_build == 'true'
+    runs-on: ${{ matrix.runner }}
+    container: ${{ matrix.container }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: x86-64-linux
+            runner: ubuntu-latest
+            container: quay.io/pypa/manylinux_2_28_x86_64
+            toolchain: x86-64-linux.cmake
+            manylinux_plat: manylinux_2_28_x86_64
+
+          - platform: x86-32-linux
+            runner: ubuntu-latest
+            container: quay.io/pypa/manylinux_2_28_i686
+            toolchain: x86-32-linux.cmake
+            manylinux_plat: manylinux_2_28_i686
+
+          - platform: arm-64-linux
+            runner: ubuntu-24.04-arm
+            container: quay.io/pypa/manylinux_2_28_aarch64
+            toolchain: arm-64-linux.cmake
+            manylinux_plat: manylinux_2_28_aarch64
+
+          - platform: arm-32-linux
+            runner: ubuntu-24.04-arm
+            toolchain: arm-32-linux.cmake
+
+          - platform: x86-64-macos
+            runner: macos-13
+            toolchain: x86-64-macos.cmake
+
+          - platform: arm-64-macos
+            runner: macos-14
+            toolchain: arm-64-macos.cmake
+
+          - platform: x86-64-windows
+            runner: windows-latest
+            toolchain: x86-64-windows.cmake
+            msvc_arch: amd64
+
+          - platform: x86-32-windows
+            runner: windows-latest
+            toolchain: x86-32-windows.cmake
+            msvc_arch: amd64_x86
+
+    env:
+      HALIDE_LLVM_REF: ${{ inputs.llvm_ref }}
+
+    steps:
+      # ---- Checkout ----
+      - uses: actions/checkout@v4
+
+      # ---- Python (manylinux containers) ----
+      - name: Set up Python (manylinux)
+        if: matrix.manylinux_plat
+        run: echo "/opt/python/cp312-cp312/bin" >> "$GITHUB_PATH"
+
+      # ---- Python (non-container) ----
+      - name: Set up Python
+        if: ${{ !matrix.manylinux_plat }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # ---- Cross-compile tools (arm-32-linux) ----
+      - name: Install ARM cross-compilation tools
+        if: matrix.platform == 'arm-32-linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf
+
+      # ---- MSVC (Windows) ----
+      - name: Set up MSVC
+        if: matrix.msvc_arch
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: ${{ matrix.msvc_arch }}
+
+      # ---- macOS deployment target ----
+      - name: Set macOS deployment target
+        if: runner.os == 'macOS'
+        run: echo "MACOSX_DEPLOYMENT_TARGET=11" >> "$GITHUB_ENV"
+
+      # ---- Build wheel ----
+      - name: Build wheel
+        run: >
+          pip wheel . -w dist/ -v
+          --config-settings=cmake.define.CMAKE_TOOLCHAIN_FILE=toolchains/${{ matrix.toolchain }}
+
+      # ---- Repair wheel (Linux manylinux) ----
+      - name: Repair wheel (auditwheel)
+        if: matrix.manylinux_plat
+        run: |
+          pip install auditwheel
+          auditwheel repair --plat ${{ matrix.manylinux_plat }} -w dist/ dist/*.whl
+          # Remove the original unrepaired wheel
+          rm -f dist/*-linux_*.whl
+
+      # ---- Repair wheel (macOS) ----
+      - name: Repair wheel (delocate)
+        if: runner.os == 'macOS'
+        run: |
+          pip install delocate
+          delocate-wheel -w dist/ dist/*.whl
+          # Remove the original unrepaired wheel
+          rm -f dist/*-macosx_*_universal*.whl 2>/dev/null || true
+
+      # ---- Upload artifact ----
+      - name: Upload wheel
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheel-${{ matrix.platform }}
+          path: dist/*.whl
+
+  # ---------------------------------------------------------------------------
+  # Job 3: Upload all wheels to private PyPI
+  # ---------------------------------------------------------------------------
+  upload:
+    name: Upload to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all wheel artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: wheel-*
+          path: dist/
+          merge-multiple: true
+
+      - name: Upload to PyPI
+        env:
+          TWINE_USERNAME: upload
+          TWINE_PASSWORD: ${{ secrets.PYPI_UPLOAD_PASSWORD }}
+          TWINE_REPOSITORY_URL: https://pypi.halide-lang.org/
+        run: |
+          pip install twine
+          twine upload dist/*.whl
