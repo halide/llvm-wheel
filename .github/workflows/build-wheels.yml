@@ -114,6 +114,7 @@ jobs:
             runner: windows-latest
             toolchain: x86-32-windows.cmake
             msvc_arch: amd64_x86
+            wheel_plat: win32
 
     env:
       HALIDE_LLVM_REF: ${{ inputs.llvm_ref }}
@@ -150,6 +151,13 @@ jobs:
         run: >
           pip wheel . -w dist/ -v
           --config-settings=cmake.define.CMAKE_TOOLCHAIN_FILE=toolchains/${{ matrix.toolchain }}
+
+      # ---- Retag wheel (scikit-build-core bug: x86 cross-compile gets win_amd64) ----
+      - name: Retag wheel
+        if: matrix.wheel_plat
+        run: |
+          pip install wheel
+          wheel tags --platform-tag ${{ matrix.wheel_plat }} --remove dist/*.whl
 
       # ---- Build wheel (docker, for i686) ----
       - name: Build wheel (docker)
