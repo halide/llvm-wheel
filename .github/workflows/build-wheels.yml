@@ -115,6 +115,8 @@ jobs:
     env:
       HALIDE_LLVM_REF: ${{ inputs.llvm_ref }}
       GITHUB_TOKEN: ${{ github.token }}
+      CMAKE_GENERATOR: Ninja
+      MACOSX_DEPLOYMENT_TARGET: "11"
 
     steps:
       # ---- Checkout ----
@@ -145,11 +147,6 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: ${{ matrix.msvc_arch }}
-
-      # ---- macOS deployment target ----
-      - name: Set macOS deployment target
-        if: runner.os == 'macOS'
-        run: echo "MACOSX_DEPLOYMENT_TARGET=11" >> "$GITHUB_ENV"
 
       # ---- Build wheel ----
       - name: Build wheel
