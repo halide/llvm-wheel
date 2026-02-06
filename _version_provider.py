@@ -12,7 +12,6 @@ Environment variables:
 
 from __future__ import annotations
 
-import io
 import json
 import os
 import re
@@ -171,7 +170,7 @@ def download_and_extract(ref: str, dest_dir: Path) -> str | None:
         shutil.rmtree(temp_dir)
     temp_dir.mkdir(parents=True)
 
-    tarball_data = None
+    extracted = False
     for url in urls:
         try:
             print(f"[provider] Downloading {url}...")
@@ -179,23 +178,28 @@ def download_and_extract(ref: str, dest_dir: Path) -> str | None:
             req.add_header("User-Agent", "halide-llvm-version-provider")
 
             with urllib.request.urlopen(req, timeout=600) as response:
-                # Read entire tarball into memory to avoid streaming issues
-                tarball_data = response.read()
+                content_length = response.headers.get("Content-Length")
+                if content_length and content_length.isdigit():
+                    size_mb = int(content_length) // 1024 // 1024
+                    print(f"[provider] Extracting streamed tarball (~{size_mb} MB)...")
+                else:
+                    print("[provider] Extracting streamed tarball...")
+
+                with tarfile.open(fileobj=response, mode="r|gz") as tar:
+                    tar.extractall(path=temp_dir, filter="data")
+            extracted = True
             break
         except urllib.error.HTTPError as e:
             if e.code == 404:
                 print(f"[provider] Not found at {url}, trying next...")
                 continue
             raise RuntimeError(f"Download failed: {e}") from e
+        except (urllib.error.URLError, tarfile.TarError, OSError) as e:
+            raise RuntimeError(f"Download or extraction failed for {url}: {e}") from e
 
-    if tarball_data is None:
+    if not extracted:
         shutil.rmtree(temp_dir)
         raise RuntimeError(f"Could not download ref '{ref}' from GitHub.")
-
-    # Extract tarball
-    print(f"[provider] Extracting ({len(tarball_data) // 1024 // 1024} MB)...")
-    with tarfile.open(fileobj=io.BytesIO(tarball_data), mode="r:gz") as tar:
-        tar.extractall(path=temp_dir, filter="data")
 
     # GitHub tarballs have a single root directory like 'llvm-project-<ref>/'
     extracted_roots = [p for p in temp_dir.iterdir() if p.is_dir()]
