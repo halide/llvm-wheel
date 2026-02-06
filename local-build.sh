@@ -94,4 +94,15 @@ fi
 echo ""
 
 # Run the build
-exec uv build --wheel --no-build-isolation "${CONFIG_SETTINGS[@]}"
+uv build --wheel --no-build-isolation "${CONFIG_SETTINGS[@]}"
+
+# Repair wheel (macOS only)
+# Disabled: delocate's -e flag does not apply to the deployment target
+# version check, so excluded iossim/ios dylibs still cause a false
+# failure. Our CMAKE_INSTALL_RPATH settings handle runtime resolution.
+# See: https://github.com/matthew-brett/delocate/issues/273
+#if [[ "$OS" == "Darwin" ]]; then
+#    echo ""
+#    echo "Running delocate-wheel..."
+#    uvx --from delocate delocate-wheel -e iossim dist/*.whl
+#fi

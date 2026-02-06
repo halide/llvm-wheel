@@ -193,6 +193,17 @@ jobs:
               rm -f dist/*-linux_*.whl
             '
 
+      # ---- Repair wheel (macOS) ----
+      # Disabled: delocate's -e flag does not apply to the deployment target
+      # version check, so excluded iossim/ios dylibs still cause a false
+      # failure. Our CMAKE_INSTALL_RPATH settings handle runtime resolution.
+      # See: https://github.com/matthew-brett/delocate/issues/273
+      #- name: Repair wheel (delocate)
+      #  if: runner.os == 'macOS'
+      #  run: |
+      #    pip install delocate
+      #    delocate-wheel -e lib/darwin -w dist/ dist/*.whl
+
       # ---- Upload artifact ----
       - name: Upload wheel
         uses: actions/upload-artifact@v4
