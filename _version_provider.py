@@ -97,8 +97,6 @@ def compute_version(ref: str, source_dir: Path, commit_sha: str | None) -> str:
 
     # Get commit info from GitHub API
     timestamp, sha = get_commit_info(ref)
-    if commit_sha:
-        sha = commit_sha  # Use SHA from download if available
 
     short_sha = sha[:8] if sha else "unknown"
     return f"{base_ver}.dev{timestamp}+g{short_sha}"
@@ -151,9 +149,9 @@ def get_commit_info(ref: str) -> tuple[str, str]:
         return timestamp, sha
 
     except (urllib.error.HTTPError, urllib.error.URLError, KeyError) as e:
-        print(f"[provider] Warning: Could not fetch commit info ({e}), using fallback")
-        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M")
-        return timestamp, "unknown"
+        raise RuntimeError(
+            f"Could not resolve commit metadata for ref {ref!r}: {e}"
+        ) from e
 
 
 def download_and_extract(ref: str, dest_dir: Path) -> str | None:
