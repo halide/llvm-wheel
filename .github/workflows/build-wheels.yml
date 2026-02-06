@@ -75,10 +75,13 @@ jobs:
             toolchain: x86-64-linux.cmake
             manylinux_plat: manylinux_2_28_x86_64
 
+          # i686: Node.js 20 has no i686 binaries, so actions/checkout
+          # cannot run inside the container. We run on the host and use
+          # docker for the build/repair steps instead.
           - platform: x86-32-linux
             runner: ubuntu-latest
-            container: quay.io/pypa/manylinux_2_28_i686
             toolchain: x86-32-linux.cmake
+            docker_image: quay.io/pypa/manylinux_2_28_i686
             manylinux_plat: manylinux_2_28_i686
 
           - platform: arm-64-linux
@@ -92,11 +95,11 @@ jobs:
             toolchain: arm-32-linux.cmake
 
           - platform: x86-64-macos
-            runner: macos-13
+            runner: macos-15-intel
             toolchain: x86-64-macos.cmake
 
           - platform: arm-64-macos
-            runner: macos-14
+            runner: macos-15
             toolchain: arm-64-macos.cmake
 
           - platform: x86-64-windows
@@ -111,6 +114,7 @@ jobs:
 
     env:
       HALIDE_LLVM_REF: ${{ inputs.llvm_ref }}
+      GITHUB_TOKEN: ${{ github.token }}
 
     steps:
       # ---- Checkout ----
@@ -118,12 +122,12 @@ jobs:
 
       # ---- Python (manylinux containers) ----
       - name: Set up Python (manylinux)
-        if: matrix.manylinux_plat
+        if: matrix.container
         run: echo "/opt/python/cp312-cp312/bin" >> "$GITHUB_PATH"
 
-      # ---- Python (non-container) ----
+      # ---- Python (non-container, non-docker) ----
       - name: Set up Python
-        if: ${{ !matrix.manylinux_plat }}
+        if: ${{ !matrix.container && !matrix.docker_image }}
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -149,18 +153,52 @@ jobs:
 
       # ---- Build wheel ----
       - name: Build wheel
+        if: ${{ !matrix.docker_image }}
         run: >
           pip wheel . -w dist/ -v
           --config-settings=cmake.define.CMAKE_TOOLCHAIN_FILE=toolchains/${{ matrix.toolchain }}
 
-      # ---- Repair wheel (Linux manylinux) ----
+      # ---- Build wheel (docker, for i686) ----
+      - name: Build wheel (docker)
+        if: matrix.docker_image
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/project" \
+            -w /project \
+            -e HALIDE_LLVM_REF \
+            -e GITHUB_TOKEN \
+            ${{ matrix.docker_image }} \
+            bash -c '
+              set -euo pipefail
+              export PATH="/opt/python/cp312-cp312/bin:$PATH"
+              pip wheel . -w dist/ -v \
+                --config-settings=cmake.define.CMAKE_TOOLCHAIN_FILE=toolchains/${{ matrix.toolchain }}
+            '
+
+      # ---- Repair wheel (auditwheel, in container) ----
       - name: Repair wheel (auditwheel)
-        if: matrix.manylinux_plat
+        if: ${{ matrix.manylinux_plat && !matrix.docker_image }}
         run: |
           pip install auditwheel
           auditwheel repair --plat ${{ matrix.manylinux_plat }} -w dist/ dist/*.whl
           # Remove the original unrepaired wheel
           rm -f dist/*-linux_*.whl
+
+      # ---- Repair wheel (auditwheel via docker, for i686) ----
+      - name: Repair wheel (auditwheel/docker)
+        if: ${{ matrix.manylinux_plat && matrix.docker_image }}
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/project" \
+            -w /project \
+            ${{ matrix.docker_image }} \
+            bash -c '
+              set -euo pipefail
+              export PATH="/opt/python/cp312-cp312/bin:$PATH"
+              pip install auditwheel
+              auditwheel repair --plat ${{ matrix.manylinux_plat }} -w dist/ dist/*.whl
+              rm -f dist/*-linux_*.whl
+            '
 
       # ---- Repair wheel (macOS) ----
       - name: Repair wheel (delocate)

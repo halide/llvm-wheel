@@ -186,12 +186,20 @@ def download_and_extract(ref: str, dest_dir: Path) -> None:
                 content_length = response.headers.get("Content-Length")
                 if content_length and content_length.isdigit():
                     size_mb = int(content_length) // 1024 // 1024
-                    print(f"[provider] Extracting streamed tarball (~{size_mb} MB)...")
+                    print(f"[provider] Downloading tarball (~{size_mb} MB)...")
                 else:
-                    print("[provider] Extracting streamed tarball...")
+                    print("[provider] Downloading tarball...")
 
-                with tarfile.open(fileobj=response, mode="r|gz") as tar:
-                    tar.extractall(path=temp_dir, filter="data")
+                # Download to a temp file first; streaming extraction
+                # (r|gz) is unreliable for large HTTP responses.
+                tarball = temp_dir / "download.tar.gz"
+                with open(tarball, "wb") as f:
+                    shutil.copyfileobj(response, f)
+
+            print("[provider] Extracting tarball...")
+            with tarfile.open(tarball, mode="r:gz") as tar:
+                tar.extractall(path=temp_dir, filter="data")
+            tarball.unlink()
             extracted = True
             break
         except urllib.error.HTTPError as e:
