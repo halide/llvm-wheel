@@ -232,5 +232,5 @@ jobs:
           TWINE_PASSWORD: ${{ secrets.PYPI_UPLOAD_PASSWORD }}
           TWINE_REPOSITORY_URL: https://pypi.halide-lang.org/
         run: |
-          pip install twine
+          pip install "twine>=6" "packaging>=24.2"
           twine upload dist/*.whl
