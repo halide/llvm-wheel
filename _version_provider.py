@@ -102,22 +102,41 @@ def compute_version(ref: str, source_dir: Path, commit_sha: str | None) -> str:
 
 
 def get_base_version(source_dir: Path) -> str:
-    """Parse Major.Minor.Patch from llvm/CMakeLists.txt."""
-    cmake_path = source_dir / "llvm" / "CMakeLists.txt"
-    if not cmake_path.exists():
-        print(f"[provider] Warning: {cmake_path} not found, using 0.0.0")
-        return "0.0.0"
+    """Parse Major.Minor.Patch from known LLVM CMake files."""
+    candidates = [
+        source_dir / "llvm" / "CMakeLists.txt",
+        source_dir / "cmake" / "Modules" / "LLVMVersion.cmake",
+    ]
 
-    content = cmake_path.read_text(encoding="utf-8")
-    major = re.search(r"set\(LLVM_VERSION_MAJOR\s+(\d+)\)", content)
-    minor = re.search(r"set\(LLVM_VERSION_MINOR\s+(\d+)\)", content)
-    patch = re.search(r"set\(LLVM_VERSION_PATCH\s+(\d+)\)", content)
+    existing_candidates = [p for p in candidates if p.exists()]
+    if not existing_candidates:
+        raise RuntimeError(
+            "Could not determine LLVM base version: none of the expected files exist: "
+            + ", ".join(str(p) for p in candidates)
+        )
 
-    if major and minor and patch:
-        return f"{major.group(1)}.{minor.group(1)}.{patch.group(1)}"
+    for cmake_path in candidates:
+        if not cmake_path.exists():
+            continue
 
-    print("[provider] Warning: Could not parse LLVM version, using 0.0.0")
-    return "0.0.0"
+        content = cmake_path.read_text(encoding="utf-8")
+        major = parse_cmake_int_var(content, "LLVM_VERSION_MAJOR")
+        minor = parse_cmake_int_var(content, "LLVM_VERSION_MINOR")
+        patch = parse_cmake_int_var(content, "LLVM_VERSION_PATCH")
+        if major is not None and minor is not None and patch is not None:
+            return f"{major}.{minor}.{patch}"
+
+    raise RuntimeError(
+        "Could not parse LLVM version from expected CMake files: "
+        + ", ".join(str(p) for p in existing_candidates)
+    )
+
+
+def parse_cmake_int_var(content: str, var_name: str) -> str | None:
+    """Parse an integer value from a CMake set(VAR value ...) statement."""
+    pattern = rf"set\(\s*{re.escape(var_name)}\s+\"?(\d+)\"?(?:\s+[^\)]*)?\)"
+    match = re.search(pattern, content)
+    return match.group(1) if match else None
 
 
 def get_commit_info(ref: str) -> tuple[str, str]:
