@@ -155,6 +155,7 @@ jobs:
       # ---- Retag wheel (scikit-build-core bug: x86 cross-compile gets win_amd64) ----
       - name: Retag wheel
         if: matrix.wheel_plat
+        shell: bash
         run: |
           pip install wheel
           wheel tags --platform-tag ${{ matrix.wheel_plat }} --remove dist/*.whl
