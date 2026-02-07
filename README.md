@@ -1,7 +1,61 @@
 # halide-llvm
 
-A Python-packaged LLVM distribution for Halide. Builds wheels against any
-arbitrary git reference (tag, branch, or commit SHA) without modifying source.
+Pre-built LLVM wheels for [Halide](https://github.com/halide/Halide), hosted on
+[pypi.halide-lang.org](https://pypi.halide-lang.org/). Builds against any
+arbitrary LLVM git reference (tag, branch, or commit SHA) and produces
+manylinux, macOS, and Windows wheels.
+
+## Installation
+
+```bash
+pip install halide-llvm==21.1.8 \
+  --extra-index-url https://pypi.halide-lang.org/simple/
+```
+
+### Available platforms
+
+| Platform          | Wheel tag                                        |
+|-------------------|--------------------------------------------------|
+| Linux x86-64      | `manylinux_2_28_x86_64`                          |
+| Linux x86-32      | `manylinux_2_28_i686`                             |
+| Linux AArch64     | `manylinux_2_28_aarch64`                          |
+| Linux ARMv7       | `manylinux_2_31_armv7l`                           |
+| macOS x86-64      | `macosx_11_0_x86_64`                              |
+| macOS ARM64       | `macosx_11_0_arm64`                               |
+| Windows x86-64    | `win_amd64`                                       |
+| Windows x86-32    | `win32`                                           |
+
+### Usage with CMake
+
+After installing, use the CLI to get the paths CMake needs:
+
+```bash
+# LLVM installation prefix (contains bin/, lib/, include/)
+halide-llvm --prefix
+
+# Directly usable with CMake
+cmake -DHalide_LLVM_ROOT=$(halide-llvm --prefix) ...
+```
+
+All CLI options:
+
+```
+halide-llvm --prefix       # Installation root
+halide-llvm --bindir       # bin/ directory (clang, lld, etc.)
+halide-llvm --includedir   # include/ directory
+halide-llvm --libdir       # lib/ directory
+halide-llvm --cmakedir     # CMake modules (lib/cmake/llvm/)
+```
+
+### Usage from Python
+
+```python
+from halide_llvm import get_root_dir, get_cmake_dir, get_bin_dir
+
+llvm_prefix = get_root_dir()
+cmake_dir = get_cmake_dir()
+clang = get_bin_dir() / "clang"
+```
 
 ## Why This Architecture?
 
@@ -121,6 +175,18 @@ All toolchains include `initial-cache.cmake` which configures:
 | `HALIDE_LLVM_REF` | Yes      | Git ref to build (tag, branch, or SHA) |
 | `GITHUB_TOKEN`    | No       | Avoids GitHub API rate limiting in CI  |
 
+## CI Workflow
+
+The `build-wheels.yml` workflow builds and uploads wheels for all platforms:
+
+```bash
+gh workflow run build-wheels.yml -f llvm_ref=llvmorg-21.1.8
+```
+
+It will skip the build if wheels for that ref already exist on
+pypi.halide-lang.org. Wheels are uploaded automatically after all platform
+builds succeed.
+
 ## Caching
 
 Downloaded sources are cached in `src_cache/`. To force a re-download, delete
@@ -129,3 +195,10 @@ the corresponding directory:
 ```bash
 rm -rf src_cache/llvmorg-21.1.8
 ```
+
+## Known Issues
+
+- **scikit-build-core x86 cross-compile tag bug:** On Windows, cross-compiling
+  for x86 from an x64 host produces a wheel incorrectly tagged `win_amd64`.
+  The CI workflow works around this by retagging the wheel after building.
+  See `get_archs()` in scikit-build-core's `builder/builder.py`.
