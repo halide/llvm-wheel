@@ -24,8 +24,6 @@ from typing import Any, Mapping
 
 # --- Configuration ---
 CACHE_ROOT = Path(__file__).parent / "src_cache"
-LLVM_REPO_OWNER = "llvm"
-LLVM_REPO_NAME = "llvm-project"
 
 
 def dynamic_metadata(
@@ -77,17 +75,31 @@ def is_valid_cached_source(source_dir: Path) -> bool:
     return (source_dir / "llvm" / "CMakeLists.txt").exists()
 
 
+def version_from_tag(ref: str) -> str | None:
+    """
+    If ref is a release or RC tag, return its PEP 440 version string.
+
+    Returns None for non-tag refs (branches, SHAs, init tags, etc.).
+    """
+    tag_match = re.match(r"^llvmorg-(\d+\.\d+\.\d+)(?:-(rc\d+))?$", ref)
+    if tag_match:
+        version = tag_match.group(1)
+        rc = tag_match.group(2)
+        return f"{version}{rc or ''}"
+    return None
+
+
 def compute_version(ref: str, source_dir: Path) -> str:
     """
     Compute PEP 440 version string.
 
     - Release tags (llvmorg-X.Y.Z) -> X.Y.Z
+    - RC tags (llvmorg-X.Y.Z-rcN) -> X.Y.ZrcN
     - Everything else -> X.Y.Z.dev0+g<sha>
     """
-    # Check for release tag pattern
-    tag_match = re.match(r"^llvmorg-(\d+\.\d+\.\d+)$", ref)
-    if tag_match:
-        return tag_match.group(1)
+    tag_version = version_from_tag(ref)
+    if tag_version:
+        return tag_version
 
     # Development version: need base version and SHA
     base_ver = get_base_version(source_dir)
@@ -111,10 +123,7 @@ def get_base_version(source_dir: Path) -> str:
             + ", ".join(str(p) for p in candidates)
         )
 
-    for cmake_path in candidates:
-        if not cmake_path.exists():
-            continue
-
+    for cmake_path in existing_candidates:
         content = cmake_path.read_text(encoding="utf-8")
         major = parse_cmake_int_var(content, "LLVM_VERSION_MAJOR")
         minor = parse_cmake_int_var(content, "LLVM_VERSION_MINOR")
@@ -139,10 +148,9 @@ def get_commit_sha(ref: str) -> str:
     """
     Resolve a git ref to its full commit SHA via the GitHub API.
     """
-    url = (
-        f"https://api.github.com/repos/{LLVM_REPO_OWNER}/{LLVM_REPO_NAME}/commits/{ref}"
+    req = urllib.request.Request(
+        f"https://api.github.com/repos/llvm/llvm-project/commits/{ref}"
     )
-    req = urllib.request.Request(url)
     req.add_header("User-Agent", "halide-llvm-version-provider")
 
     token = os.environ.get("GITHUB_TOKEN")
@@ -167,8 +175,8 @@ def download_and_extract(ref: str, dest_dir: Path) -> None:
     """Download tarball from GitHub and extract to dest_dir."""
     # GitHub tarball URLs to try (tag URL first, then generic)
     urls = [
-        f"https://github.com/{LLVM_REPO_OWNER}/{LLVM_REPO_NAME}/archive/refs/tags/{ref}.tar.gz",
-        f"https://github.com/{LLVM_REPO_OWNER}/{LLVM_REPO_NAME}/archive/{ref}.tar.gz",
+        f"https://github.com/llvm/llvm-project/archive/refs/tags/{ref}.tar.gz",
+        f"https://github.com/llvm/llvm-project/archive/{ref}.tar.gz",
     ]
 
     # Use a temp directory for atomic extraction
@@ -185,12 +193,7 @@ def download_and_extract(ref: str, dest_dir: Path) -> None:
             req.add_header("User-Agent", "halide-llvm-version-provider")
 
             with urllib.request.urlopen(req, timeout=600) as response:
-                content_length = response.headers.get("Content-Length")
-                if content_length and content_length.isdigit():
-                    size_mb = int(content_length) // 1024 // 1024
-                    print(f"[provider] Downloading tarball (~{size_mb} MB)...")
-                else:
-                    print("[provider] Downloading tarball...")
+                print("[provider] Downloading tarball...")
 
                 # Download to a temp file first; streaming extraction
                 # (r|gz) is unreliable for large HTTP responses.

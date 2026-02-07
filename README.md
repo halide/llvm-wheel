@@ -14,16 +14,16 @@ pip install halide-llvm==21.1.8 \
 
 ### Available platforms
 
-| Platform          | Wheel tag                                        |
-|-------------------|--------------------------------------------------|
-| Linux x86-64      | `manylinux_2_28_x86_64`                          |
-| Linux x86-32      | `manylinux_2_28_i686`                             |
-| Linux AArch64     | `manylinux_2_28_aarch64`                          |
-| Linux ARMv7       | `manylinux_2_31_armv7l`                           |
-| macOS x86-64      | `macosx_11_0_x86_64`                              |
-| macOS ARM64       | `macosx_11_0_arm64`                               |
-| Windows x86-64    | `win_amd64`                                       |
-| Windows x86-32    | `win32`                                           |
+| Platform       | Wheel tag                |
+|----------------|--------------------------|
+| Linux x86-64   | `manylinux_2_28_x86_64`  |
+| Linux x86-32   | `manylinux_2_28_i686`    |
+| Linux AArch64  | `manylinux_2_28_aarch64` |
+| Linux ARMv7    | `manylinux_2_31_armv7l`  |
+| macOS x86-64   | `macosx_11_0_x86_64`     |
+| macOS ARM64    | `macosx_11_0_arm64`      |
+| Windows x86-64 | `win_amd64`              |
+| Windows x86-32 | `win32`                  |
 
 ### Usage with CMake
 
@@ -90,14 +90,16 @@ variable controls both the version string and the source code to fetch.
 
 ### Version Strings
 
-| Ref              | Version                            |
-|------------------|------------------------------------|
-| `llvmorg-21.1.8` | `21.1.8`                           |
-| `main`           | `22.0.0.dev202502051630+gabcd1234` |
-| `<commit-sha>`   | `22.0.0.dev202502051630+gabcd1234` |
+| Ref                  | Version                 |
+|----------------------|-------------------------|
+| `llvmorg-21.1.8`     | `21.1.8`                |
+| `llvmorg-22.1.0-rc2` | `22.1.0rc2`             |
+| `main`               | `22.0.0.dev0+gabcd1234` |
+| `<commit-sha>`       | `22.0.0.dev0+gabcd1234` |
 
-Release tags produce clean versions. Everything else produces dev versions with
-a timestamp (for monotonic ordering) and short SHA (for traceability).
+Release tags produce clean versions. RC tags produce PEP 440 pre-release
+versions. Everything else produces dev versions with a short SHA for
+traceability.
 
 ## Build Instructions
 
@@ -199,6 +201,6 @@ rm -rf src_cache/llvmorg-21.1.8
 ## Known Issues
 
 - **scikit-build-core x86 cross-compile tag bug:** On Windows, cross-compiling
-  for x86 from an x64 host produces a wheel incorrectly tagged `win_amd64`.
-  The CI workflow works around this by retagging the wheel after building.
-  See `get_archs()` in scikit-build-core's `builder/builder.py`.
+  for x86 from an x64 host produces a wheel incorrectly tagged `win_amd64`. The
+  CI workflow works around this by retagging the wheel after building. See
+  `get_archs()` in scikit-build-core's `builder/builder.py`.

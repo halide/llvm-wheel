@@ -16,45 +16,43 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       should_build: ${{ steps.check.outputs.should_build }}
-      short_sha: ${{ steps.check.outputs.short_sha }}
     steps:
+      - uses: actions/checkout@v4
+
       - name: Resolve ref and check PyPI
         id: check
+        shell: python
         env:
           LLVM_REF: ${{ inputs.llvm_ref }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
-          set -euo pipefail
+          import os, urllib.request
+          from _version_provider import version_from_tag, get_commit_sha
 
-          # Resolve the ref to a full SHA via GitHub API
-          SHA=$(curl -fsSL \
-            -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/repos/llvm/llvm-project/commits/${LLVM_REF}" \
-            | jq -r '.sha')
+          ref = os.environ["LLVM_REF"]
 
-          SHORT_SHA="${SHA:0:8}"
-          echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
-          echo "Resolved ${LLVM_REF} -> ${SHA} (short: ${SHORT_SHA})"
+          # Build the search pattern for this ref
+          tag_version = version_from_tag(ref)
+          if tag_version:
+              pattern = f"halide_llvm-{tag_version}-"
+              print(f"Release tag detected, searching for: {pattern}")
+          else:
+              sha = get_commit_sha(ref)
+              pattern = f"g{sha[:8]}"
+              print(f"Dev ref detected, searching for: {pattern}")
 
-          # Fetch the simple index page for halide-llvm
-          INDEX=$(curl -fsSL "https://pypi.halide-lang.org/simple/halide-llvm/" || true)
+          # Check the simple index for existing wheels
+          try:
+              req = urllib.request.Request("https://pypi.halide-lang.org/simple/halide-llvm/")
+              index = urllib.request.urlopen(req, timeout=30).read().decode()
+          except Exception:
+              index = ""
 
-          # Determine the search pattern based on whether this is a release tag
-          if [[ "${LLVM_REF}" =~ ^llvmorg-([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
-            VERSION="${BASH_REMATCH[1]}"
-            PATTERN="halide_llvm-${VERSION}-"
-            echo "Release tag detected, searching for: ${PATTERN}"
-          else
-            PATTERN="g${SHORT_SHA}"
-            echo "Dev ref detected, searching for: ${PATTERN}"
-          fi
+          should_build = "false" if pattern in index else "true"
+          print(f"should_build={should_build}")
 
-          if echo "${INDEX}" | grep -qF "${PATTERN}"; then
-            echo "Wheels already exist for this ref, skipping build."
-            echo "should_build=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "No existing wheels found, proceeding with build."
-            echo "should_build=true" >> "$GITHUB_OUTPUT"
-          fi
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"should_build={should_build}\n")
 
   # ---------------------------------------------------------------------------
   # Job 2: Build wheels for all platforms

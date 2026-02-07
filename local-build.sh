@@ -101,7 +101,7 @@ run_local_macos_build() {
   echo "  Toolchain: $toolchain_path"
   echo "  Output: $dist_dir/"
 
-  uv build --wheel --no-build-isolation --out-dir "$dist_dir" "${config_settings[@]}"
+  uv build --wheel -v --no-build-isolation --out-dir "$dist_dir" "${config_settings[@]}"
 }
 
 run_linux_docker_build() {
