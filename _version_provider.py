@@ -180,6 +180,7 @@ def download_and_extract(ref: str, dest_dir: Path) -> None:
         f"https://github.com/llvm/llvm-project/archive/{ref}.tar.gz",
     ]
 
+    dest_dir.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=dest_dir.parent) as temp_dir:
         temp_path = Path(temp_dir)
 
