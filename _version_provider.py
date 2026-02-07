@@ -184,15 +184,17 @@ def download_and_extract(ref: str, dest_dir: Path) -> None:
     with tempfile.TemporaryDirectory(dir=dest_dir.parent) as temp_dir:
         temp_path = Path(temp_dir)
 
+        tarball = temp_path / "download.tar.gz"
+
         for url in urls:
             try:
-                print(f"[provider] Downloading and extracting {url}...")
+                print(f"[provider] Downloading {url}...")
                 req = urllib.request.Request(url)
                 req.add_header("User-Agent", "halide-llvm-version-provider")
 
                 with urllib.request.urlopen(req, timeout=600) as response:
-                    with tarfile.open(fileobj=response, mode="r|gz") as tar:
-                        tar.extractall(path=temp_path, filter="data")
+                    with open(tarball, "wb") as f:
+                        shutil.copyfileobj(response, f)
 
                 break
             except urllib.error.HTTPError as e:
@@ -200,10 +202,14 @@ def download_and_extract(ref: str, dest_dir: Path) -> None:
                     print(f"[provider] Not found at {url}, trying next...")
                     continue
                 raise RuntimeError(f"Download failed: {e}") from e
-            except (urllib.error.URLError, tarfile.TarError, OSError) as e:
-                raise RuntimeError(f"Download or extraction failed for {url}: {e}") from e
+            except (urllib.error.URLError, OSError) as e:
+                raise RuntimeError(f"Download failed for {url}: {e}") from e
         else:  # if the loop completes without a break, all URLs failed
             raise RuntimeError(f"Could not download ref '{ref}' from GitHub.")
+
+        print("[provider] Extracting tarball...")
+        with tarfile.open(tarball, mode="r:gz") as tar:
+            tar.extractall(path=temp_path, filter="data")
 
         # GitHub tarballs have a single root directory like 'llvm-project-<ref>/'
         extracted_roots = [p for p in temp_path.iterdir() if p.is_dir()]
