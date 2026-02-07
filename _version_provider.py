@@ -17,6 +17,7 @@ import os
 import re
 import shutil
 import tarfile
+import tempfile
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -179,57 +180,38 @@ def download_and_extract(ref: str, dest_dir: Path) -> None:
         f"https://github.com/llvm/llvm-project/archive/{ref}.tar.gz",
     ]
 
-    # Use a temp directory for atomic extraction
-    temp_dir = dest_dir.with_name(f".{dest_dir.name}_temp")
-    if temp_dir.exists():
-        shutil.rmtree(temp_dir)
-    temp_dir.mkdir(parents=True)
+    with tempfile.TemporaryDirectory(dir=dest_dir.parent) as temp_dir:
+        temp_path = Path(temp_dir)
 
-    extracted = False
-    for url in urls:
-        try:
-            print(f"[provider] Downloading {url}...")
-            req = urllib.request.Request(url)
-            req.add_header("User-Agent", "halide-llvm-version-provider")
+        for url in urls:
+            try:
+                print(f"[provider] Downloading and extracting {url}...")
+                req = urllib.request.Request(url)
+                req.add_header("User-Agent", "halide-llvm-version-provider")
 
-            with urllib.request.urlopen(req, timeout=600) as response:
-                print("[provider] Downloading tarball...")
+                with urllib.request.urlopen(req, timeout=600) as response:
+                    with tarfile.open(fileobj=response, mode="r|gz") as tar:
+                        tar.extractall(path=temp_path, filter="data")
 
-                # Download to a temp file first; streaming extraction
-                # (r|gz) is unreliable for large HTTP responses.
-                tarball = temp_dir / "download.tar.gz"
-                with open(tarball, "wb") as f:
-                    shutil.copyfileobj(response, f)
+                break
+            except urllib.error.HTTPError as e:
+                if e.code == 404:
+                    print(f"[provider] Not found at {url}, trying next...")
+                    continue
+                raise RuntimeError(f"Download failed: {e}") from e
+            except (urllib.error.URLError, tarfile.TarError, OSError) as e:
+                raise RuntimeError(f"Download or extraction failed for {url}: {e}") from e
+        else:  # if the loop completes without a break, all URLs failed
+            raise RuntimeError(f"Could not download ref '{ref}' from GitHub.")
 
-            print("[provider] Extracting tarball...")
-            with tarfile.open(tarball, mode="r:gz") as tar:
-                tar.extractall(path=temp_dir, filter="data")
-            tarball.unlink()
-            extracted = True
-            break
-        except urllib.error.HTTPError as e:
-            if e.code == 404:
-                print(f"[provider] Not found at {url}, trying next...")
-                continue
-            raise RuntimeError(f"Download failed: {e}") from e
-        except (urllib.error.URLError, tarfile.TarError, OSError) as e:
-            raise RuntimeError(f"Download or extraction failed for {url}: {e}") from e
+        # GitHub tarballs have a single root directory like 'llvm-project-<ref>/'
+        extracted_roots = [p for p in temp_path.iterdir() if p.is_dir()]
+        if not extracted_roots:
+            raise RuntimeError("Tarball appeared empty or invalid.")
 
-    if not extracted:
-        shutil.rmtree(temp_dir)
-        raise RuntimeError(f"Could not download ref '{ref}' from GitHub.")
-
-    # GitHub tarballs have a single root directory like 'llvm-project-<ref>/'
-    extracted_roots = [p for p in temp_dir.iterdir() if p.is_dir()]
-    if not extracted_roots:
-        shutil.rmtree(temp_dir)
-        raise RuntimeError("Tarball appeared empty or invalid.")
-
-    # Move inner content to final destination
-    actual_root = extracted_roots[0]
-    if dest_dir.exists():
-        shutil.rmtree(dest_dir)
-    shutil.move(str(actual_root), str(dest_dir))
-    shutil.rmtree(temp_dir)
+        # Move inner content to final destination
+        if dest_dir.exists():
+            shutil.rmtree(dest_dir)
+        shutil.move(str(extracted_roots[0]), str(dest_dir))
 
     print(f"[provider] Extracted to {dest_dir}")
