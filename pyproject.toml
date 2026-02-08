@@ -7,7 +7,7 @@ name = "halide-llvm"
 dynamic = ["version"]
 description = "LLVM distribution for Halide"
 license = "Apache-2.0"
-requires-python = ">=3.12"
+requires-python = ">=3.10"
 
 [project.scripts]
 halide-llvm = "halide_llvm:main"
