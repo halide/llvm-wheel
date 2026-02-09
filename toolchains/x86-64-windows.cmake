@@ -13,6 +13,6 @@
 
 # Only compiler-rt is relevant on Windows. libc++, libc++abi, and libunwind
 # are tied to the Itanium C++ ABI and do not build with MSVC.
-set(LLVM_ENABLE_RUNTIMES "compiler-rt")
+set(LLVM_ENABLE_RUNTIMES "compiler-rt" CACHE STRING "")
 
 include("${CMAKE_CURRENT_LIST_DIR}/initial-cache.cmake")
