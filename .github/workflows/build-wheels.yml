@@ -82,6 +82,7 @@ jobs:
             toolchain: x86-32-linux.cmake
             docker_image: quay.io/pypa/manylinux_2_28_i686
             manylinux_plat: manylinux_2_28_i686
+            pin_gcc12: true
 
           - platform: arm-64-linux
             runner: ubuntu-24.04-arm
@@ -125,10 +126,16 @@ jobs:
       # ---- Checkout ----
       - uses: actions/checkout@v4
 
-      # ---- Python (manylinux containers) ----
-      - name: Set up Python (manylinux)
+      # ---- Toolchain (manylinux containers) ----
+      # Pin GCC 12 to avoid GCC 14 libstdc++ symbols (e.g. __cxa_call_terminate)
+      # leaking into static libraries. auditwheel doesn't catch these, so
+      # consumers with older libstdc++ would get linker errors.
+      - name: Set up GCC 12 and Python (manylinux)
         if: matrix.container
-        run: echo "/opt/python/cp312-cp312/bin" >> "$GITHUB_PATH"
+        run: |
+          yum install -y gcc-toolset-12-gcc-c++
+          echo "/opt/rh/gcc-toolset-12/root/usr/bin" >> "$GITHUB_PATH"
+          echo "/opt/python/cp312-cp312/bin" >> "$GITHUB_PATH"
 
       # ---- Python (non-container, non-docker) ----
       - name: Set up Python
@@ -159,7 +166,7 @@ jobs:
           pip install wheel
           wheel tags --platform-tag ${{ matrix.wheel_plat }} --remove dist/*.whl
 
-      # ---- Build wheel (docker, for i686) ----
+      # ---- Build wheel (docker, for i686 and armv7l) ----
       - name: Build wheel (docker)
         if: matrix.docker_image
         run: |
@@ -168,9 +175,14 @@ jobs:
             -w /project \
             -e HALIDE_LLVM_REF \
             -e GITHUB_TOKEN \
+            -e PIN_GCC12=${{ matrix.pin_gcc12 && 'true' || 'false' }} \
             ${{ matrix.docker_image }} \
             bash -c '
               set -euo pipefail
+              if [ "$PIN_GCC12" = "true" ]; then
+                yum install -y gcc-toolset-12-gcc-c++
+                export PATH="/opt/rh/gcc-toolset-12/root/usr/bin:$PATH"
+              fi
               export PATH="/opt/python/cp312-cp312/bin:$PATH"
               pip wheel . -w dist/ -v \
                 --config-settings=cmake.define.CMAKE_TOOLCHAIN_FILE=toolchains/${{ matrix.toolchain }}
