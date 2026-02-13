@@ -28,7 +28,7 @@ jobs:
           PYTHONPATH: .
         run: |
           import os, urllib.request
-          from _version_provider import version_from_tag, get_commit_sha
+          from _version_provider import version_from_tag, get_commit_info
 
           ref = os.environ["LLVM_REF"]
 
@@ -38,7 +38,7 @@ jobs:
               pattern = f"halide_llvm-{tag_version}-"
               print(f"Release tag detected, searching for: {pattern}")
           else:
-              sha = get_commit_sha(ref)
+              sha, _ = get_commit_info(ref)
               pattern = f"g{sha[:8]}"
               print(f"Dev ref detected, searching for: {pattern}")
 

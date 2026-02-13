@@ -26,10 +26,15 @@ from typing import Any, Mapping
 # --- Configuration ---
 CACHE_ROOT = Path(__file__).parent / "src_cache"
 
+# Epoch tag for dev version numbering. The dev version number is the commit
+# distance from this point, which is guaranteed monotonically increasing along
+# LLVM's linear main branch. Chosen to predate our entire support matrix.
+_EPOCH_COMMIT = "llvmorg-19-init"
+
 
 def dynamic_metadata(
     field: str,
-    settings: Mapping[str, Any] | None = None,
+    _settings: Mapping[str, Any] | None = None,
 ) -> str:
     """scikit-build-core dynamic metadata hook."""
     if field != "version":
@@ -96,18 +101,17 @@ def compute_version(ref: str, source_dir: Path) -> str:
 
     - Release tags (llvmorg-X.Y.Z) -> X.Y.Z
     - RC tags (llvmorg-X.Y.Z-rcN) -> X.Y.ZrcN
-    - Everything else -> X.Y.Z.dev0+g<sha>
+    - Everything else -> X.Y.Z.devN+g<sha> (N = commits since epoch)
     """
-    tag_version = version_from_tag(ref)
-    if tag_version:
-        return tag_version
+    if version := version_from_tag(ref):
+        return version
 
-    # Development version: need base version and SHA
-    base_ver = get_base_version(source_dir)
-    sha = get_commit_sha(ref)
+    # Development version: need base version, SHA, and commit distance
+    version = get_base_version(source_dir)
+    sha, distance = get_commit_info(ref)
 
     short_sha = sha[:8] if sha else "unknown"
-    return f"{base_ver}.dev0+g{short_sha}"
+    return f"{version}.dev{distance}+g{short_sha}"
 
 
 def get_base_version(source_dir: Path) -> str:
@@ -145,31 +149,44 @@ def parse_cmake_int_var(content: str, var_name: str) -> str | None:
     return match.group(1) if match else None
 
 
-def get_commit_sha(ref: str) -> str:
-    """
-    Resolve a git ref to its full commit SHA via the GitHub API.
-    """
-    req = urllib.request.Request(
-        f"https://api.github.com/repos/llvm/llvm-project/commits/{ref}"
-    )
+def _github_api(endpoint: str) -> Any:
+    """Fetch JSON from the GitHub API (llvm/llvm-project)."""
+    url = f"https://api.github.com/repos/llvm/llvm-project/{endpoint}"
+    req = urllib.request.Request(url)
     req.add_header("User-Agent", "halide-llvm-version-provider")
+    req.add_header("Accept", "application/vnd.github+json")
 
     token = os.environ.get("GITHUB_TOKEN")
     if token:
         req.add_header("Authorization", f"token {token}")
 
-    print(f"[provider] Fetching commit info for '{ref}'...")
-
     try:
         with urllib.request.urlopen(req, timeout=30) as response:
-            data = json.load(response)
+            return json.load(response)
+    except (urllib.error.HTTPError, urllib.error.URLError) as e:
+        raise RuntimeError(f"GitHub API request failed ({endpoint}): {e}") from e
 
-        return data["sha"]
 
-    except (urllib.error.HTTPError, urllib.error.URLError, KeyError) as e:
+def get_commit_info(ref: str) -> tuple[str, int]:
+    """
+    Resolve a git ref to (full_sha, commit_distance_from_epoch).
+
+    Uses the GitHub compare API to count commits between the epoch and the
+    given ref. This count is guaranteed monotonically increasing along any
+    linear history path.
+    """
+    print(f"[provider] Fetching commit info for '{ref}' (compare to epoch)...")
+    # Compare in reverse order so the ref (base_commit) gets resolved to an SHA.
+    # This reverses the intuitive roles of ahead_by and behind_by.
+    data = _github_api(f"compare/{ref}...{_EPOCH_COMMIT}")
+
+    if (ahead_by := data["ahead_by"]) != 0:
         raise RuntimeError(
-            f"Could not resolve commit metadata for ref {ref!r}: {e}"
-        ) from e
+            f"Ref {ref!r} is {ahead_by} commits behind the epoch commit "
+            f"({_EPOCH_COMMIT}). This ref predates the support matrix."
+        )
+
+    return data["base_commit"]["sha"], data["behind_by"]
 
 
 def download_and_extract(ref: str, dest_dir: Path) -> None:
