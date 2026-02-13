@@ -49,17 +49,25 @@ endif ()
 add_subdirectory("${LLVM_SOURCE_DIR}/llvm" llvm-build)
 
 # =============================================================================
-# 5. Post-install cleanup: remove clang symlinks
+# 5. Post-install cleanup: convert clang symlinks to wrappers
 # =============================================================================
 # LLVM creates symlinks like clang++ -> clang, but wheels are ZIP files that
-# don't support symlinks. Each "symlink" becomes a full ~128MB copy. Remove
-# them to save ~500MB. Users can use --driver-mode=g++ instead of clang++.
+# don't support symlinks. Each "symlink" becomes a full ~128MB copy.
+# We replace them with small bash wrappers to save space while keeping functionality.
+install(CODE "set(CONVERT_SYMLINK_SCRIPT \"${CMAKE_CURRENT_SOURCE_DIR}/convert-symlink.sh\")")
 install(CODE [[
     file(GLOB binaries "${CMAKE_INSTALL_PREFIX}/bin/*")
     foreach (binary IN LISTS binaries)
         if (IS_SYMLINK "${binary}")
-            message(STATUS "Removing symlink: ${binary}")
-            file(REMOVE "${binary}")
+            message(STATUS "Converting symlink: ${binary}")
+            execute_process(
+                COMMAND bash "${CONVERT_SYMLINK_SCRIPT}" "${binary}"
+                RESULT_VARIABLE res
+                ERROR_VARIABLE err
+            )
+            if (NOT res EQUAL 0)
+                message(FATAL_ERROR "Failed to convert symlink: ${err}")
+            endif ()
         endif ()
     endforeach ()
 ]])
