@@ -1,6 +1,8 @@
 name: Build wheels
 
 on:
+  schedule:
+    - cron: "0 0 * * 0"  # weekly, Sunday midnight UTC
   workflow_dispatch:
     inputs:
       llvm_ref:
@@ -16,6 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       should_build: ${{ steps.check.outputs.should_build }}
+      llvm_ref: ${{ steps.check.outputs.llvm_ref }}
     steps:
       - uses: actions/checkout@v4
 
@@ -23,24 +26,27 @@ jobs:
         id: check
         shell: python
         env:
-          LLVM_REF: ${{ inputs.llvm_ref }}
+          HALIDE_LLVM_REF: ${{ inputs.llvm_ref || 'main' }}
           GITHUB_TOKEN: ${{ github.token }}
           PYTHONPATH: .
         run: |
           import os, urllib.request
           from _version_provider import version_from_tag, get_commit_info
 
-          ref = os.environ["LLVM_REF"]
+          ref = os.environ["HALIDE_LLVM_REF"]
 
           # Build the search pattern for this ref
           tag_version = version_from_tag(ref)
           if tag_version:
               pattern = f"halide_llvm-{tag_version}-"
+              resolved_ref = ref
               print(f"Release tag detected, searching for: {pattern}")
           else:
               sha, _ = get_commit_info(ref)
               pattern = f"g{sha[:8]}"
-              print(f"Dev ref detected, searching for: {pattern}")
+              resolved_ref = sha
+              print(f"Dev ref detected, resolved to: {resolved_ref}")
+              print(f"Searching for: {pattern}")
 
           # Check the simple index for existing wheels
           try:
@@ -54,6 +60,7 @@ jobs:
 
           with open(os.environ["GITHUB_OUTPUT"], "a") as f:
               f.write(f"should_build={should_build}\n")
+              f.write(f"llvm_ref={resolved_ref}\n")
 
   # ---------------------------------------------------------------------------
   # Job 2: Build wheels for all platforms
@@ -117,7 +124,7 @@ jobs:
             wheel_plat: win32
 
     env:
-      HALIDE_LLVM_REF: ${{ inputs.llvm_ref }}
+      HALIDE_LLVM_REF: ${{ needs.check.outputs.llvm_ref }}
       GITHUB_TOKEN: ${{ github.token }}
       CMAKE_GENERATOR: Ninja
       MACOSX_DEPLOYMENT_TARGET: "11"
