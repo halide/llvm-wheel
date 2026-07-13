@@ -112,13 +112,21 @@ jobs:
             runner: macos-15
             toolchain: arm-64-macos.cmake
 
+          # Pin to windows-2022 (MSVC 14.4x) rather than windows-latest. The
+          # newer runner image ships VS 2026 (MSVC 14.5x), whose STL headers
+          # emit references to vectorized-algorithm helpers (__std_rotate,
+          # __std_find_not_ch, __std_unique, ...) that don't exist in the older
+          # msvcprt.lib. Halide's own CI and the buildbots link against these
+          # wheels using VS 2022, so building them with a newer toolset produces
+          # unresolved-external link errors downstream. Keep this in lockstep
+          # with the runner label used by Halide's testing-windows.yml.
           - platform: x86-64-windows
-            runner: windows-latest
+            runner: windows-2022
             toolchain: x86-64-windows.cmake
             msvc_arch: amd64
 
           - platform: x86-32-windows
-            runner: windows-latest
+            runner: windows-2022
             toolchain: x86-32-windows.cmake
             msvc_arch: amd64_x86
             wheel_plat: win32
