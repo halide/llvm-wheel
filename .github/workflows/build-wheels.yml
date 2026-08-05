@@ -292,16 +292,10 @@ jobs:
           version="${version%%-*}"
           tag="halide-llvm@${version}"
 
-          python3 -c '
-          import hashlib, json, sys
-          manifest = {f.split("/")[-1]: hashlib.sha256(open(f, "rb").read()).hexdigest() for f in sys.argv[1:]}
-          json.dump(manifest, open("dist/manifest.json", "w"))
-          ' "${files[@]}"
-
           if gh release view "$tag" --repo halide/pypi >/dev/null 2>&1; then
-            gh release upload "$tag" "${files[@]}" dist/manifest.json --repo halide/pypi --clobber
+            gh release upload "$tag" "${files[@]}" --repo halide/pypi --clobber
           else
-            gh release create "$tag" "${files[@]}" dist/manifest.json \
+            gh release create "$tag" "${files[@]}" \
               --repo halide/pypi --title "$tag" --notes "Automated build from halide-llvm"
           fi
 
