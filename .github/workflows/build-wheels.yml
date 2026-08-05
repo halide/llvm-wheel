@@ -22,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Resolve ref and check PyPI
+      - name: Resolve ref and check halide/pypi
         id: check
         shell: python
         env:
@@ -30,7 +30,9 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           PYTHONPATH: .
         run: |
-          import os, urllib.request
+          import json
+          import os
+          import urllib.request
           from _version_provider import version_from_tag, get_commit_info
 
           ref = os.environ["HALIDE_LLVM_REF"]
@@ -48,14 +50,28 @@ jobs:
               print(f"Dev ref detected, resolved to: {resolved_ref}")
               print(f"Searching for: {pattern}")
 
-          # Check the simple index for existing wheels
-          try:
-              req = urllib.request.Request("https://pypi.halide-lang.org/simple/halide-llvm/")
-              index = urllib.request.urlopen(req, timeout=30).read().decode()
-          except Exception:
-              index = ""
+          # Check halide/pypi's existing halide-llvm release assets for a
+          # wheel filename matching this ref (same substring-match approach
+          # as the old PyPI-index scrape, just against a different source).
+          def halide_llvm_asset_names():
+              names = []
+              page = 1
+              while True:
+                  url = f"https://api.github.com/repos/halide/pypi/releases?per_page=100&page={page}"
+                  try:
+                      with urllib.request.urlopen(url, timeout=30) as resp:
+                          batch = json.load(resp)
+                  except Exception:
+                      break
+                  if not batch:
+                      break
+                  for release in batch:
+                      if release["tag_name"].startswith("halide-llvm@"):
+                          names.extend(asset["name"] for asset in release.get("assets", []))
+                  page += 1
+              return names
 
-          should_build = "false" if pattern in index else "true"
+          should_build = "false" if any(pattern in name for name in halide_llvm_asset_names()) else "true"
           print(f"should_build={should_build}")
 
           with open(os.environ["GITHUB_OUTPUT"], "a") as f:
@@ -247,12 +263,14 @@ jobs:
           path: dist/*.whl
 
   # ---------------------------------------------------------------------------
-  # Job 3: Upload all wheels to private PyPI
+  # Job 3: Publish wheels as a halide/pypi release
   # ---------------------------------------------------------------------------
   upload:
-    name: Upload to PyPI
+    name: Publish to halide/pypi
     needs: build
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.PYPI_RELEASES_TOKEN }}
     steps:
       - name: Download all wheel artifacts
         uses: actions/download-artifact@v4
@@ -261,11 +279,33 @@ jobs:
           path: dist/
           merge-multiple: true
 
-      - name: Upload to PyPI
-        env:
-          TWINE_USERNAME: upload
-          TWINE_PASSWORD: ${{ secrets.PYPI_UPLOAD_PASSWORD }}
-          TWINE_REPOSITORY_URL: https://pypi.halide-lang.org/
+      - name: Publish release
         run: |
-          pip install "twine>=6" "packaging>=24.2"
-          twine upload dist/*.whl
+          set -euo pipefail
+
+          shopt -s nullglob
+          files=(dist/halide_llvm-*.whl)
+          shopt -u nullglob
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "no wheels found in dist/, nothing to publish"
+            exit 1
+          fi
+
+          # Wheel filenames are "{name}-{version}-{python tag}-{abi
+          # tag}-{platform tag}.whl"; any hyphens in name/version are
+          # normalized to underscores specifically so "-" is an unambiguous
+          # field separator, so plain splitting is safe here.
+          filename=$(basename "${files[0]}")
+          version="${filename#halide_llvm-}"
+          version="${version%%-*}"
+          tag="halide-llvm@${version}"
+
+          if gh release view "$tag" --repo halide/pypi >/dev/null 2>&1; then
+            gh release upload "$tag" "${files[@]}" --repo halide/pypi --clobber
+          else
+            gh release create "$tag" "${files[@]}" \
+              --repo halide/pypi --title "$tag" --notes "Automated build from halide-llvm"
+          fi
+
+      - name: Trigger index rebuild
+        run: gh workflow run rebuild-index.yml --repo halide/pypi
